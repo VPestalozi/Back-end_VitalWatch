@@ -7,6 +7,14 @@ const parseNumber = (value: unknown) => {
   return Number.isNaN(parsed) ? undefined : parsed;
 };
 
+const parseDate = (value: unknown) => {
+  if (!value) return undefined;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? undefined : date;
+};
+
+const getQueryUserId = (query: Record<string, unknown>) => (query.userId || query.user_id) as string | undefined;
+
 export const createMedidas = async (req: Request, res: Response) => {
   const targetUserId = getUserId(req.body);
   const heatRate = parseNumber(req.body.heat_rate);
@@ -82,5 +90,93 @@ export const getDashboardData = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Erro ao buscar dados' });
+  }
+};
+
+export const getUmDiaBatimentos = async (req: Request, res: Response) => {
+  const userId = getQueryUserId(req.query);
+  const date = parseDate(req.query.date) ?? new Date();
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId é obrigatório' });
+  }
+
+  date.setHours(0, 0, 0, 0);
+  const nextDate = new Date(date);
+  nextDate.setDate(date.getDate() + 1);
+
+  try {
+    const result = await prisma.estatisticasDiarias.findFirst({
+      where: {
+        user_id: userId,
+        data_referencia: {
+          gte: date,
+          lt: nextDate,
+        },
+      },
+      select: {
+        data_referencia: true,
+        media_batimentos: true,
+      },
+      orderBy: {
+        data_referencia: 'asc',
+      },
+    });
+
+    if (!result) {
+      return res.status(404).json({ error: 'Nenhuma média de batimentos encontrada para este dia' });
+    }
+
+    return res.json({
+      data: result.data_referencia.toISOString().slice(0, 10),
+      media_batimentos: result.media_batimentos,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Erro ao buscar média de batimentos' });
+  }
+};
+
+export const getUmDiaOxigenacao = async (req: Request, res: Response) => {
+  const userId = getQueryUserId(req.query);
+  const date = parseDate(req.query.date) ?? new Date();
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId é obrigatório' });
+  }
+
+  date.setHours(0, 0, 0, 0);
+  const nextDate = new Date(date);
+  nextDate.setDate(date.getDate() + 1);
+
+  try {
+    const result = await prisma.estatisticasDiarias.findFirst({
+      where: {
+        user_id: userId,
+        data_referencia: {
+          gte: date,
+          lt: nextDate,
+        },
+      },
+      select: {
+        data_referencia: true,
+        media_oxigenacao: true,
+      },
+      orderBy: {
+        data_referencia: 'asc',
+      },
+    });
+
+    if (!result) {
+      return res.status(404).json({ error: 'Nenhuma média de oxigenação encontrada para este dia' });
+    }
+
+    return res.json({
+      data: result.data_referencia.toISOString().slice(0, 10),
+      media_oxigenacao: result.media_oxigenacao,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Erro ao buscar média de oxigenação' });
   }
 };
