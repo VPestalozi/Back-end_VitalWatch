@@ -1,13 +1,17 @@
 services:
-  db:
-    image: postgres:latest
-    container_name: vital_postgres
+  database:
+    image: timescale/timescaledb:latest-pg16
+    container_name: vitalwatch_db
     restart: always
     environment:
-      POSTGRES_USER: user_vital
-      POSTGRES_PASSWORD: password123
-      POSTGRES_DB: pwa_database
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=vitalpass
+      - POSTGRES_DB=vitalwatch
     ports:
       - "5432:5432"
     volumes:
-      - ./init:/docker-entrypoint-initdb.d
+      - ./init-db:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

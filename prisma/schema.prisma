@@ -1,0 +1,53 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["views"] // <--- Adicione esta linha
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email         String    @unique
+  password_hash String
+  info          UserInfo?
+  medidas       Medida[]
+
+  @@map("users")
+}
+
+model UserInfo {
+  user_id String  @id @db.Uuid
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  nome    String? @db.VarChar(100)
+  idade   Int?
+  altura  Decimal? @db.Decimal(5, 2)
+  peso    Decimal? @db.Decimal(5, 2)
+
+  @@map("user_info")
+}
+
+// Tabela de Séries Temporais (TimescaleDB)
+model Medida {
+  time       DateTime @default(now())
+  user_id    String   @db.Uuid
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  batimentos Int
+  oxigenacao Int
+
+  @@id([time, user_id])
+  @@map("medidas_brutas")
+}
+
+view EstatisticasDiarias {
+  data_referencia  DateTime @unique
+  user_id          String   @db.Uuid
+  media_batimentos Int
+  media_oxigenacao Int
+  min_batimentos   Int
+  max_batimentos   Int
+
+  @@map("estatisticas_diarias")
+}
