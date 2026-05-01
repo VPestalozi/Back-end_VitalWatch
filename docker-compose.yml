@@ -18,14 +18,12 @@ services:
     container_name: vitalwatch_app
     restart: always
     ports:
-      - "3001:3000"
+      - "3001:3001"
     environment:
+      - PORT=3001
       - DATABASE_URL=postgresql://admin:vitalpass@database:5432/vitalwatch?schema=public
     depends_on:
       - database
-    volumes:
-      - ./src:/app/src
-      - ./dist:/app/dist
 
 volumes:
   postgres_data:

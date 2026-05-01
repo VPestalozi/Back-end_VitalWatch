@@ -29,7 +29,7 @@ export const createMedidas = async (req: Request, res: Response) => {
 
   try {
     const data: any = {
-      user_id: targetUserId,
+      paciente_id: targetUserId,
       batimentos: heatRate,
       oxigenacao: spo2,
     };
@@ -56,7 +56,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
       today.setHours(0, 0, 0, 0);
       const result = await prisma.medida.findMany({
         where: {
-          user_id: userId as string,
+          paciente_id: userId as string,
           time: {
             gte: today,
           },
@@ -74,7 +74,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
     } else {
       const result = await prisma.estatisticasDiarias.findMany({
         where: {
-          user_id: userId as string,
+          paciente_id: userId as string,
         },
         select: {
           data_referencia: true,
@@ -108,7 +108,7 @@ export const getUmDiaBatimentos = async (req: Request, res: Response) => {
   try {
     const result = await prisma.estatisticasDiarias.findFirst({
       where: {
-        user_id: userId,
+        paciente_id: userId,
         data_referencia: {
           gte: date,
           lt: nextDate,
@@ -152,7 +152,7 @@ export const getUmDiaOxigenacao = async (req: Request, res: Response) => {
   try {
     const result = await prisma.estatisticasDiarias.findFirst({
       where: {
-        user_id: userId,
+        paciente_id: userId,
         data_referencia: {
           gte: date,
           lt: nextDate,
