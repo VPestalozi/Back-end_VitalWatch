@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createMedidas, getDashboardData, getUmDiaBatimentos, getUmDiaOxigenacao, } from '../controllers/MedidasController';
+import { createMedidas, getDashboardData, getUmDiaBatimentos, getUmDiaOxigenacao, createTestUser, } from '../controllers/MedidasController.js';
 
 const router = Router();
 
@@ -13,6 +13,9 @@ router.get('/dashboard', getDashboardData);
 router.get('/estatisticasDiarias/batimentos', getUmDiaBatimentos);
 
 // Rota para buscar a média diária de oxigenação
-router.get('/estatisticasDiarias/oxigenação', getUmDiaOxigenacao);
+router.get('/estatisticasDiarias/oxigenacao', getUmDiaOxigenacao);
 
+// Rota TEMPORÁRIA para criar usuário de teste
+//
+router.post('/criar-usuario-teste', createTestUser);
 export default router;

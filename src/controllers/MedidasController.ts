@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { prisma } from '../lib/prisma';
+import { prisma } from '../lib/prisma.js';
 
 const getUserId = (body: Record<string, unknown>) => (body.userId || body.user_id) as string | undefined;
 const parseNumber = (value: unknown) => {
@@ -180,3 +180,35 @@ export const getUmDiaOxigenacao = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Erro ao buscar média de oxigenação' });
   }
 };
+
+//*
+export const createTestUser = async (req: Request, res: Response) => {
+  const { email, password_hash } = req.body;
+
+  if (!email || !password_hash) {
+    return res.status(400).json({ error: 'email e password_hash são obrigatórios' });
+  }
+
+  try {
+    const user = await prisma.user.create({
+      data: {
+        email,
+        password_hash,
+      },
+    });
+
+    return res.status(201).json({
+      message: 'Usuário criado com sucesso para testes',
+      userId: user.id,
+      email: user.email,
+    });
+  } catch (error: any) {
+    console.error(error);
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: 'Email já existe' });
+    }
+    return res.status(500).json({ error: 'Erro ao criar usuário' });
+  }
+};
+
+//*

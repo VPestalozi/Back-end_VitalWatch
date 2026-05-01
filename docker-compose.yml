@@ -13,5 +13,19 @@ services:
       - ./init-db:/docker-entrypoint-initdb.d
       - postgres_data:/var/lib/postgresql/data
 
+  app:
+    build: .
+    container_name: vitalwatch_app
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - DATABASE_URL=postgresql://admin:vitalpass@database:5432/vitalwatch?schema=public
+    depends_on:
+      - database
+    volumes:
+      - ./src:/app/src
+      - ./dist:/app/dist
+
 volumes:
   postgres_data:

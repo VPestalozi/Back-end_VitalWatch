@@ -1,6 +1,7 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["views"] // <--- Adicione esta linha
+  previewFeatures = ["views"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -9,41 +10,48 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  email         String    @unique
-  password_hash String
-  info          UserInfo?
-  medidas       Medida[]
+  id                    String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email                 String     @unique
+  password_hash         String
+  role                  String     @default("paciente") @db.VarChar(50)
+  paciente              Paciente?  @relation("UserPaciente")
+  pacientes_registrados Paciente[] @relation("EnfermeiraPacientes")
+  medidas               Medida[]
 
   @@map("users")
 }
 
-model UserInfo {
-  user_id String  @id @db.Uuid
-  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  nome    String? @db.VarChar(100)
-  idade   Int?
-  altura  Decimal? @db.Decimal(5, 2)
-  peso    Decimal? @db.Decimal(5, 2)
+model Paciente {
+  paciente_id String @id @db.Uuid
+  user        User   @relation("UserPaciente", fields: [paciente_id], references: [id], onDelete: Cascade)
 
-  @@map("user_info")
+  enfermeira_id String? @db.Uuid
+  enfermeira    User?   @relation("EnfermeiraPacientes", fields: [enfermeira_id], references: [id], onDelete: SetNull)
+
+  id_micro String?  @unique @db.VarChar(100)
+  nome     String?  @db.VarChar(100)
+  idade    Int?
+  altura   Decimal? @db.Decimal(5, 2)
+  peso     Decimal? @db.Decimal(5, 2)
+
+  @@map("pacientes")
 }
 
 // Tabela de Séries Temporais (TimescaleDB)
 model Medida {
-  time       DateTime @default(now())
-  user_id    String   @db.Uuid
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  batimentos Int
-  oxigenacao Int
+  time        DateTime @default(now())
+  paciente_id String   @db.Uuid
+  user        User     @relation(fields: [paciente_id], references: [id], onDelete: Cascade)
+  batimentos  Int
+  oxigenacao  Int
 
-  @@id([time, user_id])
+  @@id([time, paciente_id])
   @@map("medidas_brutas")
 }
 
 view EstatisticasDiarias {
   data_referencia  DateTime @unique
-  user_id          String   @db.Uuid
+  paciente_id      String   @db.Uuid
   media_batimentos Int
   media_oxigenacao Int
   min_batimentos   Int

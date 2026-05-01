@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import medidasRoutes from './routes/medidas';
+import medidasRoutes from './routes/medidas.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
