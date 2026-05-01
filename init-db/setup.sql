@@ -35,14 +35,19 @@ SELECT
     avg(batimentos)::INT AS media_batimentos,
     avg(oxigenacao)::INT AS media_oxigenacao,
     min(batimentos) AS min_batimentos,
-    max(batimentos) AS max_batimentos
+    max(batimentos) AS max_batimentos,
+    min(oxigenacao) AS min_oxigenacao,
+    max(oxigenacao) AS max_oxigenacao
 FROM medidas_brutas
 GROUP BY data_referencia, paciente_id
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('estatisticas_diarias',
-    start_offset => INTERVAL '1 days',
+    start_offset => INTERVAL '2 days',
     end_offset => INTERVAL '1 hour',
     schedule_interval => INTERVAL '1 hour');
+
+-- Força a agregação em tempo real caso o banco venha a ser recriado do zero
+ALTER MATERIALIZED VIEW estatisticas_diarias SET (timescaledb.materialized_only = false);
 
 SELECT add_retention_policy('medidas_brutas', INTERVAL '2 days');

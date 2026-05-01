@@ -56,6 +56,8 @@ view EstatisticasDiarias {
   media_oxigenacao Int
   min_batimentos   Int
   max_batimentos   Int
+  min_oxigenacao   Int
+  max_oxigenacao   Int
 
   @@map("estatisticas_diarias")
 }

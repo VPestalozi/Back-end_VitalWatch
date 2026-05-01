@@ -15,21 +15,31 @@ const parseDate = (value: unknown) => {
 
 const getQueryUserId = (query: Record<string, unknown>) => (query.userId || query.user_id) as string | undefined;
 
-export const createMedidas = async (req: Request, res: Response) => {
-  const targetUserId = getUserId(req.body);
+import type { AuthRequest } from '../middlewares/authMiddleware.js';
+
+export const createMedidas = async (req: Request, res: Response): Promise<any> => {
+  const id_micro = req.body.id_micro;
   const heatRate = parseNumber(req.body.heat_rate);
   const spo2 = parseNumber(req.body.spo2);
   const timestamp = req.body.timestamp;
 
-  if (!targetUserId || heatRate === undefined || spo2 === undefined) {
+  if (!id_micro || heatRate === undefined || spo2 === undefined) {
     return res.status(400).json({ 
-      error: 'userId, heat_rate e spo2 são obrigatórios e devem ser numéricos' 
+      error: 'id_micro, heat_rate e spo2 são obrigatórios' 
     });
   }
 
   try {
+    const paciente = await prisma.paciente.findUnique({
+      where: { id_micro: String(id_micro) }
+    });
+
+    if (!paciente) {
+      return res.status(404).json({ error: 'Paciente com este id_micro não encontrado' });
+    }
+
     const data: any = {
-      paciente_id: targetUserId,
+      paciente_id: paciente.paciente_id,
       batimentos: heatRate,
       oxigenacao: spo2,
     };
@@ -47,8 +57,13 @@ export const createMedidas = async (req: Request, res: Response) => {
   }
 };
 
-export const getDashboardData = async (req: Request, res: Response) => {
-  const { userId, periodo } = req.query;
+export const getDashboardData = async (req: AuthRequest, res: Response): Promise<any> => {
+  const userId = req.user?.id;
+  const { periodo } = req.query;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Não autorizado' });
+  }
 
   try {
     if (periodo === 'hoje') {
@@ -56,7 +71,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
       today.setHours(0, 0, 0, 0);
       const result = await prisma.medida.findMany({
         where: {
-          paciente_id: userId as string,
+          paciente_id: userId,
           time: {
             gte: today,
           },
@@ -74,7 +89,7 @@ export const getDashboardData = async (req: Request, res: Response) => {
     } else {
       const result = await prisma.estatisticasDiarias.findMany({
         where: {
-          paciente_id: userId as string,
+          paciente_id: userId,
         },
         select: {
           data_referencia: true,
@@ -93,17 +108,19 @@ export const getDashboardData = async (req: Request, res: Response) => {
   }
 };
 
-export const getUmDiaBatimentos = async (req: Request, res: Response) => {
-  const userId = getQueryUserId(req.query);
-  const date = parseDate(req.query.date) ?? new Date();
+export const getUmDiaBatimentos = async (req: AuthRequest, res: Response): Promise<any> => {
+  const userId = req.user?.id;
+  const parsedDate = parseDate(req.query.date) ?? new Date();
 
   if (!userId) {
-    return res.status(400).json({ error: 'userId é obrigatório' });
+    return res.status(401).json({ error: 'Não autorizado' });
   }
 
-  date.setHours(0, 0, 0, 0);
+  // Ajusta para o início do dia no formato UTC (00:00:00 UTC) igual ao do banco de dados
+  const date = new Date(Date.UTC(parsedDate.getUTCFullYear(), parsedDate.getUTCMonth(), parsedDate.getUTCDate()));
+  
   const nextDate = new Date(date);
-  nextDate.setDate(date.getDate() + 1);
+  nextDate.setUTCDate(date.getUTCDate() + 1);
 
   try {
     const result = await prisma.estatisticasDiarias.findFirst({
@@ -137,17 +154,19 @@ export const getUmDiaBatimentos = async (req: Request, res: Response) => {
   }
 };
 
-export const getUmDiaOxigenacao = async (req: Request, res: Response) => {
-  const userId = getQueryUserId(req.query);
-  const date = parseDate(req.query.date) ?? new Date();
+export const getUmDiaOxigenacao = async (req: AuthRequest, res: Response): Promise<any> => {
+  const userId = req.user?.id;
+  const parsedDate = parseDate(req.query.date) ?? new Date();
 
   if (!userId) {
-    return res.status(400).json({ error: 'userId é obrigatório' });
+    return res.status(401).json({ error: 'Não autorizado' });
   }
 
-  date.setHours(0, 0, 0, 0);
+  // Ajusta para o início do dia no formato UTC (00:00:00 UTC) igual ao do banco de dados
+  const date = new Date(Date.UTC(parsedDate.getUTCFullYear(), parsedDate.getUTCMonth(), parsedDate.getUTCDate()));
+  
   const nextDate = new Date(date);
-  nextDate.setDate(date.getDate() + 1);
+  nextDate.setUTCDate(date.getUTCDate() + 1);
 
   try {
     const result = await prisma.estatisticasDiarias.findFirst({
@@ -180,35 +199,3 @@ export const getUmDiaOxigenacao = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Erro ao buscar média de oxigenação' });
   }
 };
-
-//*
-export const createTestUser = async (req: Request, res: Response) => {
-  const { email, password_hash } = req.body;
-
-  if (!email || !password_hash) {
-    return res.status(400).json({ error: 'email e password_hash são obrigatórios' });
-  }
-
-  try {
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password_hash,
-      },
-    });
-
-    return res.status(201).json({
-      message: 'Usuário criado com sucesso para testes',
-      userId: user.id,
-      email: user.email,
-    });
-  } catch (error: any) {
-    console.error(error);
-    if (error.code === 'P2002') {
-      return res.status(400).json({ error: 'Email já existe' });
-    }
-    return res.status(500).json({ error: 'Erro ao criar usuário' });
-  }
-};
-
-//*
