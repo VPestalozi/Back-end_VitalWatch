@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const SECRET_KEY = (process.env.JWT_SECRET || 'chave-secreta-padrao-temporaria') as string;
+export const SECRET_KEY = (process.env.JWT_SECRET) as string;
 
 export interface AuthRequest extends Request {
   user?: {

@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
 import type { AuthRequest } from '../middlewares/authMiddleware.js';
 
-const SECRET_KEY = (process.env.JWT_SECRET || 'chave-secreta-padrao-temporaria') as string;
+const SECRET_KEY = (process.env.JWT_SECRET) as string;
 
 export class AuthController {
   // Rota aberta: Registro da Enfermeira

@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
+import type { AuthRequest } from '../middlewares/authMiddleware.js';
 
-const getUserId = (body: Record<string, unknown>) => (body.userId || body.user_id) as string | undefined;
 const parseNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isNaN(parsed) ? undefined : parsed;
@@ -13,10 +13,6 @@ const parseDate = (value: unknown) => {
   return Number.isNaN(date.getTime()) ? undefined : date;
 };
 
-const getQueryUserId = (query: Record<string, unknown>) => (query.userId || query.user_id) as string | undefined;
-
-import type { AuthRequest } from '../middlewares/authMiddleware.js';
-
 export const createMedidas = async (req: Request, res: Response): Promise<any> => {
   const id_micro = req.body.id_micro;
   const heatRate = parseNumber(req.body.heat_rate);
@@ -24,8 +20,8 @@ export const createMedidas = async (req: Request, res: Response): Promise<any> =
   const timestamp = req.body.timestamp;
 
   if (!id_micro || heatRate === undefined || spo2 === undefined) {
-    return res.status(400).json({ 
-      error: 'id_micro, heat_rate e spo2 são obrigatórios' 
+    return res.status(400).json({
+      error: 'id_micro, heat_rate e spo2 são obrigatórios'
     });
   }
 
@@ -49,6 +45,19 @@ export const createMedidas = async (req: Request, res: Response): Promise<any> =
     }
 
     await prisma.medida.create({ data });
+
+    // Emissão do evento WebSocket para a sala da enfermeira
+    if (paciente.enfermeira_id) {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`enfermeira_${paciente.enfermeira_id}`).emit('novaMedida', {
+          paciente_id: paciente.paciente_id,
+          batimentos: heatRate,
+          oxigenacao: spo2,
+          time: data.time || new Date(),
+        });
+      }
+    }
 
     return res.status(201).json({ message: 'Medidas registradas com sucesso' });
   } catch (error) {
@@ -118,7 +127,7 @@ export const getUmDiaBatimentos = async (req: AuthRequest, res: Response): Promi
 
   // Ajusta para o início do dia no formato UTC (00:00:00 UTC) igual ao do banco de dados
   const date = new Date(Date.UTC(parsedDate.getUTCFullYear(), parsedDate.getUTCMonth(), parsedDate.getUTCDate()));
-  
+
   const nextDate = new Date(date);
   nextDate.setUTCDate(date.getUTCDate() + 1);
 
@@ -164,7 +173,7 @@ export const getUmDiaOxigenacao = async (req: AuthRequest, res: Response): Promi
 
   // Ajusta para o início do dia no formato UTC (00:00:00 UTC) igual ao do banco de dados
   const date = new Date(Date.UTC(parsedDate.getUTCFullYear(), parsedDate.getUTCMonth(), parsedDate.getUTCDate()));
-  
+
   const nextDate = new Date(date);
   nextDate.setUTCDate(date.getUTCDate() + 1);
 
@@ -199,3 +208,6 @@ export const getUmDiaOxigenacao = async (req: AuthRequest, res: Response): Promi
     return res.status(500).json({ error: 'Erro ao buscar média de oxigenação' });
   }
 };
+
+
+

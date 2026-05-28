@@ -16,7 +16,6 @@ model User {
   role                  String     @default("paciente") @db.VarChar(50)
   paciente              Paciente?  @relation("UserPaciente")
   pacientes_registrados Paciente[] @relation("EnfermeiraPacientes")
-  medidas               Medida[]
 
   @@map("users")
 }
@@ -34,6 +33,8 @@ model Paciente {
   altura   Decimal? @db.Decimal(5, 2)
   peso     Decimal? @db.Decimal(5, 2)
 
+  medidas  Medida[]
+
   @@map("pacientes")
 }
 
@@ -41,7 +42,7 @@ model Paciente {
 model Medida {
   time        DateTime @default(now())
   paciente_id String   @db.Uuid
-  user        User     @relation(fields: [paciente_id], references: [id], onDelete: Cascade)
+  paciente    Paciente @relation(fields: [paciente_id], references: [paciente_id], onDelete: Cascade)
   batimentos  Int
   oxigenacao  Int
 

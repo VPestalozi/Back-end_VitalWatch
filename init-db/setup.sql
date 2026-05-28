@@ -5,7 +5,7 @@ CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'paciente'
+    role VARCHAR(50) NOT NULL DEFAULT 'paciente' CHECK (role IN ('paciente', 'enfermeira'))
 );
 
 CREATE TABLE pacientes (
@@ -20,7 +20,7 @@ CREATE TABLE pacientes (
 
 CREATE TABLE medidas_brutas (
     time TIMESTAMPTZ NOT NULL,
-    paciente_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    paciente_id UUID NOT NULL REFERENCES pacientes(paciente_id) ON DELETE CASCADE,
     batimentos INT,
     oxigenacao INT
 );

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Manual - WebSocket VitalWatch</title>
+    <!-- Importando o cliente do Socket.IO via CDN -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        .container { display: flex; gap: 20px; }
+        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex: 1; }
+        h2 { margin-top: 0; color: #333; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        label { font-weight: bold; display: block; margin-top: 15px; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #0056b3; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+        pre { background: #eee; padding: 10px; border-radius: 4px; overflow-x: auto; max-height: 300px; }
+    </style>
+</head>
+<body>
+
+    <h1>Painel de Teste Manual do WebSocket</h1>
+    <p>Use esta página para simular o front-end conectando ao Socket.IO e também o ESP enviando medições.</p>
+
+    <div class="container">
+        <!-- PAINEL DA ENFERMEIRA (FRONT-END) -->
+        <div class="panel">
+            <h2>1. Simulador do Front-end (Enfermeira)</h2>
+            <label for="jwtToken">Token JWT da Enfermeira:</label>
+            <input type="text" id="jwtToken" placeholder="Cole aqui o token recebido no login...">
+            <button onclick="conectarSocket()">Conectar WebSocket</button>
+            <p id="socketStatus" style="margin-top: 10px;">Status: Desconectado</p>
+
+            <h3>Eventos Recebidos:</h3>
+            <pre id="logEventos">Aguardando eventos...</pre>
+        </div>
+
+        <!-- PAINEL DO ESP (HARDWARE) -->
+        <div class="panel">
+            <h2>2. Simulador do ESP (Hardware)</h2>
+            <p>Envie uma medição para testar se chega no painel ao lado.</p>
+            
+            <label for="idMicro">ID Micro (id_micro do paciente):</label>
+            <input type="text" id="idMicro" placeholder="Ex: esp32-paciente-1">
+            
+            <label for="batimentos">Batimentos (bpm):</label>
+            <input type="number" id="batimentos" placeholder="Ex: 80" value="80">
+            
+            <label for="oxigenacao">Oxigenação (SpO2 %):</label>
+            <input type="number" id="oxigenacao" placeholder="Ex: 98" value="98">
+
+            <button onclick="enviarMedicao()" style="background-color: #28a745;">Enviar POST /medidas</button>
+            <p id="postStatus" style="margin-top: 10px;"></p>
+        </div>
+    </div>
+
+    <script>
+        let socket;
+
+        function conectarSocket() {
+            const token = document.getElementById("jwtToken").value.trim();
+            const statusEl = document.getElementById("socketStatus");
+            const logEl = document.getElementById("logEventos");
+
+            if (!token) {
+                alert("Por favor, insira o Token JWT da enfermeira.");
+                return;
+            }
+
+            if (socket) {
+                socket.disconnect();
+            }
+
+            statusEl.innerHTML = "Conectando...";
+            statusEl.className = "";
+
+            // Conectando ao backend Node.js
+            socket = io("http://localhost:3001", {
+                auth: { token: token }
+            });
+
+            socket.on("connect", () => {
+                statusEl.innerHTML = "Status: Conectado! (ID: " + socket.id + ")";
+                statusEl.className = "success";
+                logEvent("Conexão estabelecida com sucesso.");
+            });
+
+            socket.on("connect_error", (err) => {
+                statusEl.innerHTML = "Status: Erro de Autenticação - " + err.message;
+                statusEl.className = "error";
+                logEvent("Erro na conexão: " + err.message);
+            });
+
+            socket.on("disconnect", () => {
+                statusEl.innerHTML = "Status: Desconectado";
+                statusEl.className = "error";
+                logEvent("Conexão encerrada.");
+            });
+
+            // ESCUTANDO O EVENTO "novaMedida"
+            socket.on("novaMedida", (dados) => {
+                logEvent("🔔 NOVA MEDIDA RECEBIDA!\n" + JSON.stringify(dados, null, 2));
+            });
+        }
+
+        function logEvent(msg) {
+            const logEl = document.getElementById("logEventos");
+            if (logEl.innerText === "Aguardando eventos...") {
+                logEl.innerText = "";
+            }
+            const time = new Date().toLocaleTimeString();
+            logEl.innerText = `[${time}] ${msg}\n\n` + logEl.innerText;
+        }
+
+        async function enviarMedicao() {
+            const idMicro = document.getElementById("idMicro").value.trim();
+            const batimentos = document.getElementById("batimentos").value;
+            const oxigenacao = document.getElementById("oxigenacao").value;
+            const statusEl = document.getElementById("postStatus");
+
+            if (!idMicro || !batimentos || !oxigenacao) {
+                alert("Preencha todos os campos do ESP.");
+                return;
+            }
+
+            statusEl.innerHTML = "Enviando...";
+            statusEl.className = "";
+
+            const payload = {
+                id_micro: idMicro,
+                heat_rate: Number(batimentos),
+                spo2: Number(oxigenacao),
+                timestamp: new Date().toISOString()
+            };
+
+            try {
+                const response = await fetch("http://localhost:3001/medidas", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusEl.innerHTML = "Enviado com sucesso!";
+                    statusEl.className = "success";
+                } else {
+                    statusEl.innerHTML = "Erro no envio: " + (data.error || "Desconhecido");
+                    statusEl.className = "error";
+                }
+            } catch (error) {
+                statusEl.innerHTML = "Falha na requisição (verifique se o servidor está rodando).";
+                statusEl.className = "error";
+            }
+        }
+    </script>
+</body>
+</html>
