@@ -13,6 +13,7 @@ model User {
   id                    String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   email                 String     @unique
   password_hash         String
+  nome                  String?    @db.VarChar(100)
   role                  String     @default("paciente") @db.VarChar(50)
   paciente              Paciente?  @relation("UserPaciente")
   pacientes_registrados Paciente[] @relation("EnfermeiraPacientes")
@@ -30,8 +31,8 @@ model Paciente {
   id_micro String?  @unique @db.VarChar(100)
   nome     String?  @db.VarChar(100)
   idade    Int?
-  altura   Decimal? @db.Decimal(5, 2)
-  peso     Decimal? @db.Decimal(5, 2)
+  cpf      String?  @unique @db.VarChar(14)
+  telefone String?  @db.VarChar(20)
 
   medidas  Medida[]
 
@@ -50,7 +51,9 @@ model Medida {
   @@map("medidas_brutas")
 }
 
-view EstatisticasDiarias {
+
+
+view EstatisticasHorarias {
   data_referencia  DateTime @unique
   paciente_id      String   @db.Uuid
   media_batimentos Int
@@ -60,5 +63,5 @@ view EstatisticasDiarias {
   min_oxigenacao   Int
   max_oxigenacao   Int
 
-  @@map("estatisticas_diarias")
+  @@map("estatisticas_horarias")
 }

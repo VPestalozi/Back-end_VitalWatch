@@ -9,10 +9,10 @@ const SECRET_KEY = (process.env.JWT_SECRET) as string;
 export class AuthController {
   // Rota aberta: Registro da Enfermeira
   static async enfermeiraRegistro(req: Request, res: Response): Promise<any> {
-    const { email, senha } = req.body;
+    const { email, senha, nome } = req.body;
 
-    if (!email || !senha) {
-      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+    if (!email || !senha || !nome) {
+      return res.status(400).json({ error: 'Email, senha e nome são obrigatórios' });
     }
 
     try {
@@ -27,13 +27,14 @@ export class AuthController {
         data: {
           email,
           password_hash,
+          nome,
           role: 'enfermeira',
         },
       });
 
       return res.status(201).json({
         message: 'Enfermeira registrada com sucesso',
-        user: { id: novaEnfermeira.id, email: novaEnfermeira.email, role: novaEnfermeira.role },
+        user: { id: novaEnfermeira.id, email: novaEnfermeira.email, nome: novaEnfermeira.nome, role: novaEnfermeira.role },
       });
     } catch (error) {
       console.error('Erro no registro da enfermeira:', error);
@@ -50,7 +51,7 @@ export class AuthController {
       return res.status(401).json({ error: 'Não autorizado' });
     }
 
-    const { email, senha, nome, idade, altura, peso, id_micro } = req.body;
+    const { email, senha, nome, idade, cpf, telefone, id_micro } = req.body;
 
     if (!email || !senha || !nome) {
       return res.status(400).json({ error: 'Email, senha e nome são obrigatórios' });
@@ -75,8 +76,8 @@ export class AuthController {
               enfermeira_id,
               nome,
               idade: idade ? Number(idade) : null,
-              altura: altura ? Number(altura) : null,
-              peso: peso ? Number(peso) : null,
+              cpf: cpf || null,
+              telefone: telefone || null,
               id_micro: id_micro || null,
             },
           },
@@ -133,11 +134,52 @@ export class AuthController {
         user: {
           id: user.id,
           email: user.email,
+          nome: user.nome,
           role: user.role,
         },
       });
     } catch (error) {
       console.error('Erro no login:', error);
+      return res.status(500).json({ error: 'Erro interno no servidor' });
+    }
+  }
+
+  // Rota Protegida: Alterar Senha
+  static async changePassword(req: AuthRequest, res: Response): Promise<any> {
+    const userId = req.user?.id;
+    const { senhaAtual, novaSenha } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Não autorizado' });
+    }
+
+    if (!senhaAtual || !novaSenha) {
+      return res.status(400).json({ error: 'Senha atual e nova senha são obrigatórias' });
+    }
+
+    try {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+
+      if (!user) {
+        return res.status(404).json({ error: 'Usuário não encontrado' });
+      }
+
+      const isPasswordValid = await bcrypt.compare(senhaAtual, user.password_hash);
+
+      if (!isPasswordValid) {
+        return res.status(400).json({ error: 'Senha atual incorreta' });
+      }
+
+      const password_hash = await bcrypt.hash(novaSenha, 10);
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { password_hash },
+      });
+
+      return res.json({ message: 'Senha alterada com sucesso' });
+    } catch (error) {
+      console.error('Erro na alteração de senha:', error);
       return res.status(500).json({ error: 'Erro interno no servidor' });
     }
   }

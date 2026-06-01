@@ -13,4 +13,7 @@ router.post('/enfermeiraRegistro', AuthController.enfermeiraRegistro);
 // Rota protegida: Registro de Paciente (Apenas enfermeiras logadas)
 router.post('/pacienteRegistro', authMiddleware, requireNurseRole, AuthController.pacienteRegistro);
 
+// Rota protegida: Troca de Senha
+router.put('/change-password', authMiddleware, AuthController.changePassword);
+
 export default router;

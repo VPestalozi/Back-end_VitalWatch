@@ -46,17 +46,20 @@ export const createMedidas = async (req: Request, res: Response): Promise<any> =
 
     await prisma.medida.create({ data });
 
-    // Emissão do evento WebSocket para a sala da enfermeira
-    if (paciente.enfermeira_id) {
-      const io = req.app.get('io');
-      if (io) {
-        io.to(`enfermeira_${paciente.enfermeira_id}`).emit('novaMedida', {
-          paciente_id: paciente.paciente_id,
-          batimentos: heatRate,
-          oxigenacao: spo2,
-          time: data.time || new Date(),
-        });
+    // Emissão do evento WebSocket para a sala da enfermeira e do paciente
+    const io = req.app.get('io');
+    if (io) {
+      const payload = {
+        paciente_id: paciente.paciente_id,
+        batimentos: heatRate,
+        oxigenacao: spo2,
+        time: data.time || new Date(),
+      };
+      
+      if (paciente.enfermeira_id) {
+        io.to(`enfermeira_${paciente.enfermeira_id}`).emit('novaMedida', payload);
       }
+      io.to(`paciente_${paciente.paciente_id}`).emit('novaMedida', payload);
     }
 
     return res.status(201).json({ message: 'Medidas registradas com sucesso' });
@@ -66,58 +69,7 @@ export const createMedidas = async (req: Request, res: Response): Promise<any> =
   }
 };
 
-export const getDashboardData = async (req: AuthRequest, res: Response): Promise<any> => {
-  const userId = req.user?.id;
-  const { periodo } = req.query;
-
-  if (!userId) {
-    return res.status(401).json({ error: 'Não autorizado' });
-  }
-
-  try {
-    if (periodo === 'hoje') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const result = await prisma.medida.findMany({
-        where: {
-          paciente_id: userId,
-          time: {
-            gte: today,
-          },
-        },
-        select: {
-          batimentos: true,
-          oxigenacao: true,
-          time: true,
-        },
-        orderBy: {
-          time: 'asc',
-        },
-      });
-      return res.json(result);
-    } else {
-      const result = await prisma.estatisticasDiarias.findMany({
-        where: {
-          paciente_id: userId,
-        },
-        select: {
-          data_referencia: true,
-          media_batimentos: true,
-        },
-        orderBy: {
-          data_referencia: 'desc',
-        },
-        take: 30,
-      });
-      return res.json(result);
-    }
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Erro ao buscar dados' });
-  }
-};
-
-export const getUmDiaBatimentos = async (req: AuthRequest, res: Response): Promise<any> => {
+export const mediaBatimentoHora = async (req: AuthRequest, res: Response): Promise<any> => {
   const userId = req.user?.id;
   const parsedDate = parseDate(req.query.date) ?? new Date();
 
@@ -125,19 +77,20 @@ export const getUmDiaBatimentos = async (req: AuthRequest, res: Response): Promi
     return res.status(401).json({ error: 'Não autorizado' });
   }
 
-  // Ajusta para o início do dia no formato UTC (00:00:00 UTC) igual ao do banco de dados
-  const date = new Date(Date.UTC(parsedDate.getUTCFullYear(), parsedDate.getUTCMonth(), parsedDate.getUTCDate()));
+  // Arredonda para o início da hora
+  const endHour = new Date(parsedDate);
+  endHour.setMinutes(0, 0, 0);
 
-  const nextDate = new Date(date);
-  nextDate.setUTCDate(date.getUTCDate() + 1);
+  const startHour = new Date(endHour);
+  startHour.setHours(endHour.getHours() - 6);
 
   try {
-    const result = await prisma.estatisticasDiarias.findFirst({
+    const result = await prisma.estatisticasHorarias.findMany({
       where: {
         paciente_id: userId,
         data_referencia: {
-          gte: date,
-          lt: nextDate,
+          gte: startHour,
+          lte: endHour,
         },
       },
       select: {
@@ -149,21 +102,27 @@ export const getUmDiaBatimentos = async (req: AuthRequest, res: Response): Promi
       },
     });
 
-    if (!result) {
-      return res.status(404).json({ error: 'Nenhuma média de batimentos encontrada para este dia' });
+    // Mapeando para garantir 7 horas (se não tiver dado preenche com 0)
+    const data = [];
+    for (let i = 6; i >= 0; i--) {
+      const hour = new Date(endHour);
+      hour.setHours(endHour.getHours() - i);
+      
+      const found = result.find(r => r.data_referencia.getTime() === hour.getTime());
+      data.push({
+        hora: hour.toISOString(),
+        media: found ? found.media_batimentos : 0
+      });
     }
 
-    return res.json({
-      data: result.data_referencia.toISOString().slice(0, 10),
-      media_batimentos: result.media_batimentos,
-    });
+    return res.json(data);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: 'Erro ao buscar média de batimentos' });
+    return res.status(500).json({ error: 'Erro ao buscar médias' });
   }
 };
 
-export const getUmDiaOxigenacao = async (req: AuthRequest, res: Response): Promise<any> => {
+export const mediaOxigenacaoHora = async (req: AuthRequest, res: Response): Promise<any> => {
   const userId = req.user?.id;
   const parsedDate = parseDate(req.query.date) ?? new Date();
 
@@ -171,19 +130,20 @@ export const getUmDiaOxigenacao = async (req: AuthRequest, res: Response): Promi
     return res.status(401).json({ error: 'Não autorizado' });
   }
 
-  // Ajusta para o início do dia no formato UTC (00:00:00 UTC) igual ao do banco de dados
-  const date = new Date(Date.UTC(parsedDate.getUTCFullYear(), parsedDate.getUTCMonth(), parsedDate.getUTCDate()));
+  // Arredonda para o início da hora
+  const endHour = new Date(parsedDate);
+  endHour.setMinutes(0, 0, 0);
 
-  const nextDate = new Date(date);
-  nextDate.setUTCDate(date.getUTCDate() + 1);
+  const startHour = new Date(endHour);
+  startHour.setHours(endHour.getHours() - 6);
 
   try {
-    const result = await prisma.estatisticasDiarias.findFirst({
+    const result = await prisma.estatisticasHorarias.findMany({
       where: {
         paciente_id: userId,
         data_referencia: {
-          gte: date,
-          lt: nextDate,
+          gte: startHour,
+          lte: endHour,
         },
       },
       select: {
@@ -195,19 +155,22 @@ export const getUmDiaOxigenacao = async (req: AuthRequest, res: Response): Promi
       },
     });
 
-    if (!result) {
-      return res.status(404).json({ error: 'Nenhuma média de oxigenação encontrada para este dia' });
+    // Mapeando para garantir 7 horas (se não tiver dado preenche com 0)
+    const data = [];
+    for (let i = 6; i >= 0; i--) {
+      const hour = new Date(endHour);
+      hour.setHours(endHour.getHours() - i);
+      
+      const found = result.find(r => r.data_referencia.getTime() === hour.getTime());
+      data.push({
+        hora: hour.toISOString(),
+        media: found ? found.media_oxigenacao : 0
+      });
     }
 
-    return res.json({
-      data: result.data_referencia.toISOString().slice(0, 10),
-      media_oxigenacao: result.media_oxigenacao,
-    });
+    return res.json(data);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: 'Erro ao buscar média de oxigenação' });
+    return res.status(500).json({ error: 'Erro ao buscar médias' });
   }
 };
-
-
-

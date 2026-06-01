@@ -42,6 +42,10 @@ io.on('connection', (socket) => {
     const roomName = `enfermeira_${user.id}`;
     socket.join(roomName);
     console.log(`Enfermeira(o) ${user.id} conectada(o) à sala ${roomName}`);
+  } else if (user?.role === 'paciente') {
+    const roomName = `paciente_${user.id}`;
+    socket.join(roomName);
+    console.log(`Paciente ${user.id} conectado à sala ${roomName}`);
   }
 
   socket.on('disconnect', () => {

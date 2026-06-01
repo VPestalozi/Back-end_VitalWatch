@@ -3,10 +3,10 @@ import { prisma } from '../lib/prisma.js';
 import type { AuthRequest } from '../middlewares/authMiddleware.js';
 
 export const getInfoPacienteCard = async (req: AuthRequest, res: Response): Promise<any> => {
-  const id = req.body.paciente_id;
+  const id = req.params.id as string;
 
   if (!id) {
-    return res.status(400).json({ error: 'ID do paciente não fornecido no corpo da requisição' });
+    return res.status(400).json({ error: 'ID do paciente não fornecido na requisição' });
   }
 
   try {
@@ -15,6 +15,11 @@ export const getInfoPacienteCard = async (req: AuthRequest, res: Response): Prom
       select: {
         nome: true,
         idade: true,
+        user: {
+          select: {
+            email: true,
+          },
+        },
       },
     });
 
@@ -22,7 +27,11 @@ export const getInfoPacienteCard = async (req: AuthRequest, res: Response): Prom
       return res.status(404).json({ error: 'Paciente não encontrado' });
     }
 
-    return res.json(paciente);
+    return res.json({
+      nome: paciente.nome,
+      idade: paciente.idade,
+      email: paciente.user.email,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: 'Erro ao buscar informações do paciente' });
